@@ -39,3 +39,108 @@ async def test_attachment_deleted_with_task(auth_client, task):
     await auth_client.delete(f"/tasks/{task['id']}")
     dl = await auth_client.get(f"/attachments/{aid}/download")
     assert dl.status_code == 404
+
+
+async def test_attachment_filename_path_traversal_is_neutralized(auth_client, task):
+    """A malicious filename like ``../../etc/pwned.txt`` must not escape the
+    configured attachments directory, and the DB-stored filename must be
+    sanitized (no slashes, no special chars beyond [A-Za-z0-9._\\- ])."""
+    import os as _os
+    from pathlib import Path as _Path
+
+    from app.core.config import get_settings
+    from app.models.attachment import Attachment as _Attachment
+    from app.core.db import get_sessionmaker
+    from sqlalchemy import select as _select
+
+    settings = get_settings()
+    attachments_dir = _Path(settings.attachments_dir).resolve()
+
+    files = {
+        "file": (
+            "../../etc/pwned.txt",
+            io.BytesIO(b"payload"),
+            "text/plain",
+        )
+    }
+    r = await auth_client.post(f"/tasks/{task['id']}/attachments", files=files)
+    assert r.status_code == 201, r.text
+    body = r.json()
+
+    # DB filename (used for Content-Disposition) must be sanitized: no slashes,
+    # no `..` traversal segments.
+    assert "/" not in body["filename"]
+    assert "\\" not in body["filename"]
+    assert ".." not in body["filename"]
+
+    # Look up the row to inspect storage_path on disk.
+    async with get_sessionmaker()() as session:
+        res = await session.execute(
+            _select(_Attachment).where(_Attachment.id == body["id"])
+        )
+        att = res.scalar_one()
+
+    storage_path = _Path(att.storage_path).resolve()
+    # File must be physically inside the attachments dir (no traversal escape).
+    assert str(storage_path).startswith(str(attachments_dir) + _os.sep), (
+        f"storage_path {storage_path} escaped attachments dir {attachments_dir}"
+    )
+    # On-disk basename must NOT contain any path separators or `..`.
+    base = _os.path.basename(att.storage_path)
+    assert "/" not in base and "\\" not in base
+    assert ".." not in base
+    # File must actually exist where we expect.
+    assert storage_path.is_file()
+
+
+async def test_attachment_extension_whitelisted_and_name_sanitized(auth_client, task):
+    """`.exe` is a normal extension and must survive on the storage filename.
+    A nasty name with `#`, `/`, `..` must be sanitized in the DB filename."""
+    import os as _os
+    from pathlib import Path as _Path
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    attachments_dir = _Path(settings.attachments_dir).resolve()
+
+    # .exe extension preserved on storage filename
+    r1 = await auth_client.post(
+        f"/tasks/{task['id']}/attachments",
+        files={"file": ("installer.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+    )
+    assert r1.status_code == 201, r1.text
+
+    from app.models.attachment import Attachment as _Attachment
+    from app.core.db import get_sessionmaker
+    from sqlalchemy import select as _select
+
+    async with get_sessionmaker()() as session:
+        res = await session.execute(
+            _select(_Attachment).where(_Attachment.id == r1.json()["id"])
+        )
+        att1 = res.scalar_one()
+    assert att1.storage_path.endswith(".exe"), att1.storage_path
+    assert _Path(att1.storage_path).resolve().is_file()
+
+    # Sanitization of nasty name: `Pas#word/../foo.txt`
+    r2 = await auth_client.post(
+        f"/tasks/{task['id']}/attachments",
+        files={"file": ("Pas#word/../foo.txt", io.BytesIO(b"x"), "text/plain")},
+    )
+    assert r2.status_code == 201, r2.text
+    body2 = r2.json()
+    # DB-stored display filename has no `/`, no `..`, and `#` is replaced.
+    assert "/" not in body2["filename"]
+    assert ".." not in body2["filename"]
+    assert "#" not in body2["filename"]
+
+    async with get_sessionmaker()() as session:
+        res = await session.execute(
+            _select(_Attachment).where(_Attachment.id == body2["id"])
+        )
+        att2 = res.scalar_one()
+    storage_path = _Path(att2.storage_path).resolve()
+    assert str(storage_path).startswith(str(attachments_dir) + _os.sep)
+    base = _os.path.basename(att2.storage_path)
+    assert "/" not in base and ".." not in base
