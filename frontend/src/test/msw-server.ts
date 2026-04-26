@@ -89,6 +89,13 @@ export const handlers = [
     Object.assign(t, body);
     return HttpResponse.json(t);
   }),
+  http.delete(`${BASE}/tasks/:id`, ({ params }) => {
+    const id = Number(params.id);
+    const idx = state.tasks.findIndex((x) => x.id === id);
+    if (idx === -1) return new HttpResponse(null, { status: 404 });
+    state.tasks.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   http.get(`${BASE}/tasks/:id/comments`, ({ params }) => {
     const id = Number(params.id);

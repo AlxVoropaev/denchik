@@ -42,9 +42,10 @@ export function useUpdateTask() {
 export function useDeleteTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => tasks.remove(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tasks"] });
+    mutationFn: ({ id }: { id: number; epicId: number }) => tasks.remove(id),
+    onSuccess: (_data, { id, epicId }) => {
+      qc.invalidateQueries({ queryKey: ["tasks", epicId] });
+      qc.removeQueries({ queryKey: ["task", id] });
     },
   });
 }
