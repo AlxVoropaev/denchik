@@ -82,12 +82,12 @@ export function WorkspacePage() {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", height: "100%" }}>
-      <aside style={{ background: "#fff", borderRight: "1px solid #dfe1e6", padding: 12 }}>
+      <aside className="sidebar">
         <h4>Epic groups</h4>
         {(groups.data ?? []).map((g) => (
           <div key={g.id}>
             <button
-              style={{ background: "none", border: "none", color: groupId === g.id ? "#0747a6" : "inherit", fontWeight: 600 }}
+              className={`sidebar-link is-group${groupId === g.id ? " is-active" : ""}`}
               onClick={() => { setGroupId(g.id); setEpicId(null); }}
             >
               {g.name}
@@ -102,7 +102,7 @@ export function WorkspacePage() {
             {(epics.data ?? []).map((e) => (
               <div key={e.id}>
                 <button
-                  style={{ background: "none", border: "none", color: epicId === e.id ? "#0747a6" : "inherit" }}
+                  className={`sidebar-link${epicId === e.id ? " is-active" : ""}`}
                   onClick={() => setEpicId(e.id)}
                 >
                   {e.name}

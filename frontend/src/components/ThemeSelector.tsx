@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+// Keep this list in sync with the inline bootstrap script in `frontend/index.html`.
 export const THEMES = [
   { value: "github-light", label: "GitHub Light" },
   { value: "github-dark", label: "GitHub Dark" },
@@ -32,9 +33,17 @@ export function ThemeSelector() {
     const current = document.documentElement.getAttribute("data-theme");
     return current && VALID.has(current) ? (current as ThemeId) : readStored();
   });
+  const isFirstRun = useRef(true);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    // Skip persisting on the initial mount — the bootstrap script already
+    // applied either the stored value or the default, and writing here would
+    // promote the default into a "user choice" the user never made.
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
@@ -45,7 +54,7 @@ export function ThemeSelector() {
   return (
     <select
       id="theme-select"
-      aria-label="Theme"
+      aria-label="Color theme"
       value={theme}
       onChange={(e) => setTheme(e.target.value as ThemeId)}
     >

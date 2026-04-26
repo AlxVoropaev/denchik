@@ -17,18 +17,17 @@ export function App() {
     if (location.pathname !== "/login") return <Navigate to="/login" replace />;
     return (
       <>
-        <ThemeSelector />
         <Routes>
           <Route path="/login" element={<AuthPage />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        <ThemeSelector />
       </>
     );
   }
 
   return (
     <div className="app-shell">
-      <ThemeSelector />
       <header className="topbar">
         <strong>denchik</strong>
         <Link to="/" className={location.pathname === "/" ? "active" : ""}>Home</Link>
@@ -47,6 +46,7 @@ export function App() {
         <Route path="/w/:wsId/task/:taskId" element={<TaskPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ThemeSelector />
     </div>
   );
 }

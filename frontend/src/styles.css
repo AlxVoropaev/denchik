@@ -5,7 +5,6 @@
   color-scheme: light;
   --bg: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #f4f5f7;
   --text: #172b4d;
   --text-muted: #5e6c84;
   --border: #dfe1e6;
@@ -35,7 +34,6 @@
   color-scheme: dark;
   --bg: #0d1117;
   --surface: #161b22;
-  --surface-2: #21262d;
   --text: #e6edf3;
   --text-muted: #8b949e;
   --border: #30363d;
@@ -65,7 +63,6 @@
   color-scheme: light;
   --bg: #faf4f2;
   --surface: #ffffff;
-  --surface-2: #f2ece4;
   --text: #29242a;
   --text-muted: #72696a;
   --border: #cfc1bd;
@@ -95,7 +92,6 @@
   color-scheme: dark;
   --bg: #2d2a2e;
   --surface: #403e41;
-  --surface-2: #221f22;
   --text: #fcfcfa;
   --text-muted: #939293;
   --border: #5b595c;
@@ -154,8 +150,24 @@ button { cursor: pointer; }
 .task-detail { padding: 16px; max-width: 880px; margin: 0 auto; background: var(--surface); border-radius: 6px; }
 .task-detail h1 { margin: 0 0 8px 0; }
 .task-detail .desc { white-space: pre-wrap; padding: 12px; background: var(--task-desc-bg); border-radius: 4px; min-height: 60px; }
+.task-detail input, .task-detail textarea, .task-detail select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  padding: 6px 8px; font: inherit;
+}
 .comment { padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px; margin-top: 8px; background: var(--comment-bg); }
 .comment.reply { margin-left: 32px; background: var(--comment-reply-bg); }
+.error { color: var(--err); font-size: 13px; margin: 4px 0; }
+
+.sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.sidebar-link { background: none; border: none; padding: 4px 0; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.sidebar-link.is-group { font-weight: 600; }
+.sidebar-link.is-active { color: var(--link); }
+.sidebar input, .sidebar select, .sidebar textarea {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font: inherit;
+}
+.sidebar button:not(.sidebar-link) {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font: inherit;
+}
 
 .auth-card { max-width: 360px; margin: 80px auto; background: var(--surface); padding: 24px; border-radius: 6px; box-shadow: var(--shadow-modal); color: var(--text); }
 .auth-card input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; background: var(--surface); color: var(--text); }
