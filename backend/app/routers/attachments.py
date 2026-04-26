@@ -74,9 +74,13 @@ async def _ws_for_task(session, task_id: int) -> tuple[Task, int]:
     if task is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
     epic = await session.get(Epic, task.epic_id)
-    assert epic is not None
+    if epic is None:
+        # Task FK normally guarantees this, but ``assert`` would vanish under
+        # ``python -O`` and the next attribute access would 500. Be explicit.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic not found")
     group = await session.get(EpicGroup, epic.epic_group_id)
-    assert group is not None
+    if group is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic group not found")
     return task, group.workspace_id
 
 
