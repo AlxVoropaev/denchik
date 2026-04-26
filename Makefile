@@ -28,6 +28,7 @@ build:
 test: test-backend test-frontend
 
 test-backend:
+	docker compose build backend
 	docker compose run --rm backend pytest
 
 test-frontend:
