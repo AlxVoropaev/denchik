@@ -101,7 +101,19 @@ async def upload_attachment(
         storage_path=storage_path,
     )
     session.add(att)
-    await session.commit()
+    # The on-disk write happened before the commit, so a commit failure (FK
+    # violation, IntegrityError, etc.) would leave an orphaned blob. Unlink
+    # the file before re-raising. NB: keep this try/except tightly scoped to
+    # `commit()` — a later failure (e.g. from `refresh`) means the row is
+    # already persisted and the file should NOT be removed.
+    try:
+        await session.commit()
+    except Exception:
+        try:
+            os.unlink(storage_path)
+        except OSError:
+            pass
+        raise
     await session.refresh(att)
     return att
 
