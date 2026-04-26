@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import re
 import uuid
@@ -6,6 +7,28 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+
+# Whitelist of MIME types we accept on upload. Anything outside this set is
+# rejected with 415 — both because the project doesn't need it, and because
+# inline-renderable types like text/html or image/svg+xml on the app's own
+# origin would let an attacker XSS by uploading + sharing a download link.
+# `application/octet-stream` covers binary blobs whose precise type we don't
+# care about (the download endpoint serves everything as octet-stream anyway).
+ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset(
+    {
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/octet-stream",
+    }
+)
 
 # Whitelist for storage-side extension. Anything that doesn't match is dropped
 # rather than reflected onto disk, so a hostile filename can't shape the
@@ -81,6 +104,22 @@ async def upload_attachment(
     task, ws_id = await _ws_for_task(session, task_id)
     await require_workspace_member(ws_id, session, user)
 
+    # Reject anything outside the whitelist before we touch the disk. The
+    # client-supplied content_type isn't authoritative, but a mismatch here
+    # is enough to block obvious abuses (text/html, image/svg+xml, etc.).
+    declared_type = (file.content_type or "application/octet-stream").lower()
+    if declared_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Unsupported file type"
+        )
+
+    # Cross-check against what the filename's extension implies. If the two
+    # disagree on family (e.g. .html uploaded as image/png), fall back to a
+    # safe generic type rather than trusting the client header.
+    guessed, _ = mimetypes.guess_type(file.filename or "")
+    if guessed and guessed.lower() != declared_type:
+        declared_type = "application/octet-stream"
+
     data = await file.read()
     if len(data) > settings.max_attachment_bytes:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large")
@@ -96,7 +135,7 @@ async def upload_attachment(
         task_id=task.id,
         uploaded_by=user.id,
         filename=safe_display_name,
-        content_type=file.content_type or "application/octet-stream",
+        content_type=declared_type,
         size=len(data),
         storage_path=storage_path,
     )
@@ -127,4 +166,14 @@ async def download_attachment(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     _, ws_id = await _ws_for_task(session, att.task_id)
     await require_workspace_member(ws_id, session, user)
-    return FileResponse(att.storage_path, filename=att.filename, media_type=att.content_type)
+    # Always serve as a generic binary download, regardless of the stored
+    # content_type. This neutralizes any user-uploaded HTML/SVG/JS that would
+    # otherwise be rendered inline by the browser on the app's own origin —
+    # the canonical "stored XSS via file upload" footgun. Starlette's
+    # FileResponse already sets Content-Disposition: attachment when a
+    # filename is provided.
+    return FileResponse(
+        att.storage_path,
+        filename=att.filename,
+        media_type="application/octet-stream",
+    )
