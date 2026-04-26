@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>denchik</title>
+    <script>
+      (function () {
+        var DEFAULT = "github-light";
+        var VALID = ["github-light", "github-dark", "monokai-pro-light", "monokai-pro-dark"];
+        try {
+          var t = localStorage.getItem("theme");
+          document.documentElement.setAttribute(
+            "data-theme",
+            t && VALID.indexOf(t) !== -1 ? t : DEFAULT
+          );
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", DEFAULT);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

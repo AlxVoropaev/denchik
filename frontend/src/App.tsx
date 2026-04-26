@@ -1,4 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { ThemeSelector } from "./components/ThemeSelector";
 import { useMe, useLogout } from "./hooks/useAuth";
 import { AuthPage } from "./pages/AuthPage";
 import { TaskPage } from "./pages/TaskPage";
@@ -15,23 +16,27 @@ export function App() {
   if (!me.data) {
     if (location.pathname !== "/login") return <Navigate to="/login" replace />;
     return (
-      <Routes>
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <>
+        <ThemeSelector />
+        <Routes>
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </>
     );
   }
 
   return (
     <div className="app-shell">
+      <ThemeSelector />
       <header className="topbar">
         <strong>denchik</strong>
         <Link to="/" className={location.pathname === "/" ? "active" : ""}>Home</Link>
         <span className="spacer" />
         <span>{me.data.display_name}</span>
         <button
+          className="logout-btn"
           onClick={() => logout.mutate(undefined, { onSuccess: () => navigate("/login") })}
-          style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", padding: "6px 10px", borderRadius: 4 }}
         >
           Logout
         </button>
