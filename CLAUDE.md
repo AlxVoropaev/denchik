@@ -133,6 +133,17 @@ code — they exist *because* of past failures or external library quirks.
   `fireEvent.drop(target, { dataTransfer })` from
   `@testing-library/react` with a hand-rolled `dataTransfer` object — see
   `BoardView.test.tsx` for the working shape.
+- **Theming via CSS variables + `data-theme`.** Four themes ship today:
+  `github-light` (default), `github-dark`, `monokai-pro-light`,
+  `monokai-pro-dark`. All colors live as `--bg`/`--surface`/`--text`/...
+  in `frontend/src/styles.css`; each theme overrides the variables under
+  `[data-theme="…"]`. The selected theme is persisted in
+  `localStorage["theme"]` and applied to `<html>` by the inline bootstrap
+  script in `frontend/index.html` **before** React mounts — that prevents
+  a flash of the wrong theme. Don't add hard-coded colors in components
+  or inline styles; route everything through the CSS variables so all
+  four themes stay consistent. The `<ThemeSelector>` component is the
+  one source of truth for switching at runtime.
 
 ### Data & infra
 
