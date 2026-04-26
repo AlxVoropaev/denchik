@@ -13,3 +13,11 @@ frontend/dist/
 .env
 .claude/settings.local.json
 **/*.egg-info/
+
+# Throwaway smoke harness for headless Playwright runs (see CLAUDE.md → reference)
+/node_modules/
+/package.json
+/package-lock.json
+/smoke.mjs
+/[0-9][0-9]-*.png
+
