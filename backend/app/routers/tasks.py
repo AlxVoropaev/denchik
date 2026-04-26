@@ -23,8 +23,19 @@ async def _task_workspace_id(session, epic_id: int) -> int:
 
 
 async def _load_task(session, task_id: int) -> Task:
+    """Load a task plus everything routers need for RBAC + label work.
+
+    Eagerly joins ``Task.epic.group`` so callers can read
+    ``task.epic.group.workspace_id`` without two extra round-trips through
+    ``session.get(Epic, ...)`` / ``session.get(EpicGroup, ...)``.
+    """
     res = await session.execute(
-        select(Task).options(selectinload(Task.labels)).where(Task.id == task_id)
+        select(Task)
+        .options(
+            selectinload(Task.labels),
+            selectinload(Task.epic).selectinload(Epic.group),
+        )
+        .where(Task.id == task_id)
     )
     task = res.scalar_one_or_none()
     if task is None:
@@ -105,7 +116,7 @@ async def create_task(
 @router.get("/{task_id}", response_model=TaskOut)
 async def get_task(task_id: int, user: CurrentUser, session: SessionDep) -> Task:
     task = await _load_task(session, task_id)
-    ws_id = await _task_workspace_id(session, task.epic_id)
+    ws_id = task.epic.group.workspace_id
     await require_workspace_member(ws_id, session, user)
     return task
 
@@ -115,7 +126,7 @@ async def update_task(
     task_id: int, payload: TaskUpdate, user: CurrentUser, session: SessionDep
 ) -> Task:
     task = await _load_task(session, task_id)
-    ws_id = await _task_workspace_id(session, task.epic_id)
+    ws_id = task.epic.group.workspace_id
     await require_workspace_member(ws_id, session, user)
 
     data = payload.model_dump(exclude_unset=True)
@@ -136,7 +147,7 @@ async def update_task(
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(task_id: int, user: CurrentUser, session: SessionDep) -> None:
     task = await _load_task(session, task_id)
-    ws_id = await _task_workspace_id(session, task.epic_id)
+    ws_id = task.epic.group.workspace_id
     await require_workspace_member(ws_id, session, user)
     await session.delete(task)
     await session.commit()
