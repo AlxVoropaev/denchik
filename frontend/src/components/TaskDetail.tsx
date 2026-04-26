@@ -8,13 +8,19 @@ export function TaskDetail({ taskId }: { taskId: number }) {
   const update = useUpdateTask();
   const { data: comments } = useComments(taskId);
   const createComment = useCreateComment(taskId);
+  // Editor-open state intentionally takes precedence over server-side task
+  // changes; we never clobber an in-progress edit when `task` updates.
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState("");
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [editingDesc, setEditingDesc] = useState(false);
   const [desc, setDesc] = useState("");
+  const [descError, setDescError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [replyBody, setReplyBody] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   if (isLoading || !task) return <div>Loading…</div>;
 
@@ -23,23 +29,45 @@ export function TaskDetail({ taskId }: { taskId: number }) {
   const repliesOf = (id: number) =>
     (comments ?? []).filter((c) => c.parent_comment_id === id);
 
+  const saveTitle = () => {
+    setTitleError(null);
+    update.mutate(
+      { id: task.id, data: { title } },
+      {
+        onSuccess: () => setEditingTitle(false),
+        onError: () => setTitleError("Couldn’t save title. Try again."),
+      },
+    );
+  };
+
+  const saveDesc = () => {
+    setDescError(null);
+    update.mutate(
+      { id: task.id, data: { description: desc } },
+      {
+        onSuccess: () => setEditingDesc(false),
+        onError: () => setDescError("Couldn’t save description. Try again."),
+      },
+    );
+  };
+
   return (
     <div className="task-detail">
       {editingTitle ? (
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => {
-            update.mutate({ id: task.id, data: { title } });
-            setEditingTitle(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-        />
+        <div>
+          <input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+          {titleError && <div className="error" role="alert">{titleError}</div>}
+        </div>
       ) : (
-        <h1 onClick={() => { setTitle(task.title); setEditingTitle(true); }}>{task.title}</h1>
+        <h1 onClick={() => { setTitle(task.title); setTitleError(null); setEditingTitle(true); }}>{task.title}</h1>
       )}
 
       <div className="meta">
@@ -74,22 +102,23 @@ export function TaskDetail({ taskId }: { taskId: number }) {
 
       <h3>Description</h3>
       {editingDesc ? (
-        <textarea
-          autoFocus
-          value={desc}
-          rows={6}
-          style={{ width: "100%" }}
-          onChange={(e) => setDesc(e.target.value)}
-          onBlur={() => {
-            update.mutate({ id: task.id, data: { description: desc } });
-            setEditingDesc(false);
-          }}
-        />
+        <div>
+          <textarea
+            autoFocus
+            value={desc}
+            rows={6}
+            style={{ width: "100%" }}
+            onChange={(e) => setDesc(e.target.value)}
+            onBlur={saveDesc}
+          />
+          {descError && <div className="error" role="alert">{descError}</div>}
+        </div>
       ) : (
         <div
           className="desc"
           onClick={() => {
             setDesc(task.description ?? "");
+            setDescError(null);
             setEditingDesc(true);
           }}
         >
@@ -106,25 +135,33 @@ export function TaskDetail({ taskId }: { taskId: number }) {
         onChange={(e) => setNewComment(e.target.value)}
       />
       <button
+        disabled={createComment.isPending || !newComment.trim()}
         onClick={() => {
-          if (newComment.trim()) {
-            createComment.mutate({ body: newComment.trim() });
-            setNewComment("");
-          }
+          const body = newComment.trim();
+          if (!body) return;
+          setCommentError(null);
+          createComment.mutate(
+            { body },
+            {
+              onSuccess: () => setNewComment(""),
+              onError: () => setCommentError("Couldn’t post comment. Try again."),
+            },
+          );
         }}
       >
         Post
       </button>
+      {commentError && <div className="error" role="alert">{commentError}</div>}
 
       {top.map((c: Comment) => (
         <div key={c.id}>
           <div className="comment">
-            <div>{c.body}</div>
-            <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>Reply</button>
+            <div style={{ whiteSpace: "pre-wrap" }}>{c.body}</div>
+            <button onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyError(null); }}>Reply</button>
           </div>
           {repliesOf(c.id).map((r) => (
             <div key={r.id} className="comment reply">
-              <div>{r.body}</div>
+              <div style={{ whiteSpace: "pre-wrap" }}>{r.body}</div>
             </div>
           ))}
           {replyTo === c.id && (
@@ -137,16 +174,26 @@ export function TaskDetail({ taskId }: { taskId: number }) {
                 style={{ width: "100%" }}
               />
               <button
+                disabled={createComment.isPending || !replyBody.trim()}
                 onClick={() => {
-                  if (replyBody.trim()) {
-                    createComment.mutate({ body: replyBody.trim(), parentId: c.id });
-                    setReplyBody("");
-                    setReplyTo(null);
-                  }
+                  const body = replyBody.trim();
+                  if (!body) return;
+                  setReplyError(null);
+                  createComment.mutate(
+                    { body, parentId: c.id },
+                    {
+                      onSuccess: () => {
+                        setReplyBody("");
+                        setReplyTo(null);
+                      },
+                      onError: () => setReplyError("Couldn’t post reply. Try again."),
+                    },
+                  );
                 }}
               >
                 Send reply
               </button>
+              {replyError && <div className="error" role="alert">{replyError}</div>}
             </div>
           )}
         </div>
