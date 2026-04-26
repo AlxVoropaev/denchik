@@ -5,8 +5,9 @@ services:
     environment:
       DATABASE_URL: sqlite+aiosqlite:////app/data/denchik.db
       ATTACHMENTS_DIR: /app/data/attachments
-      JWT_SECRET: dev-jwt-secret-change-me-please-32b
-      CORS_ORIGINS: '["http://localhost:5173"]'
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required, see .env.example}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173"]}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -17,7 +18,7 @@ services:
     build: ./frontend
     container_name: denchik-frontend
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     volumes:
       - ./frontend:/app
       - /app/node_modules
