@@ -52,13 +52,15 @@ export function WorkspacePage() {
   );
 
   useEffect(() => {
-    if (groups.data && groups.data.length > 0 && groupId == null) {
-      setGroupId(groups.data[0].id);
+    const first = groups.data?.[0];
+    if (first && groupId == null) {
+      setGroupId(first.id);
     }
   }, [groups.data, groupId]);
   useEffect(() => {
-    if (epics.data && epics.data.length > 0 && epicId == null) {
-      setEpicId(epics.data[0].id);
+    const first = epics.data?.[0];
+    if (first && epicId == null) {
+      setEpicId(first.id);
     }
   }, [epics.data, epicId]);
 
@@ -68,8 +70,12 @@ export function WorkspacePage() {
   if (wsQuery.data.length === 0) {
     return <CreateFirstWorkspace />;
   }
+  const firstWs = wsQuery.data[0];
+  if (workspaceId == null && firstWs) {
+    return <Navigate to={`/w/${firstWs.id}/board`} replace />;
+  }
   if (workspaceId == null) {
-    return <Navigate to={`/w/${wsQuery.data[0].id}/board`} replace />;
+    return <CreateFirstWorkspace />;
   }
 
   const currentView = view === "forum" ? "forum" : "board";
