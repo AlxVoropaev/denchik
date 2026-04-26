@@ -24,7 +24,7 @@ describe("TaskDetail", () => {
     await user.type(screen.getByPlaceholderText(/Add a comment/i), "Hello world");
     await user.click(screen.getByRole("button", { name: /post/i }));
     await waitFor(() => expect(state.comments).toHaveLength(1));
-    expect(state.comments[0].body).toBe("Hello world");
+    expect(state.comments[0]?.body).toBe("Hello world");
   });
 
   it("changes status via select", async () => {
@@ -32,6 +32,6 @@ describe("TaskDetail", () => {
     renderWithProviders(<TaskDetail taskId={1} />);
     await waitFor(() => expect(screen.getByText("Buy milk")).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Status/i), "done");
-    await waitFor(() => expect(state.tasks[0].status).toBe("done"));
+    await waitFor(() => expect(state.tasks[0]?.status).toBe("done"));
   });
 });

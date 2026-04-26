@@ -17,8 +17,9 @@ describe("QuickAddTask", () => {
     await user.type(input, "Buy milk{Enter}");
 
     await waitFor(() => expect(state.tasks).toHaveLength(1));
-    expect(state.tasks[0].title).toBe("Buy milk");
-    expect(state.tasks[0].status).toBe("todo");
+    const created = state.tasks[0];
+    expect(created?.title).toBe("Buy milk");
+    expect(created?.status).toBe("todo");
   });
 
   it("Esc cancels", async () => {
