@@ -1,3 +1,5 @@
+import { useAuthStore } from "../store/auth";
+
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 console.log("[api] BASE =", BASE);
 
@@ -5,6 +7,27 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
+}
+
+// Tests inject a spy via setAuthRedirect; production uses window.location.assign.
+type RedirectFn = (target: string) => void;
+let redirectFn: RedirectFn | null = null;
+
+export function setAuthRedirect(fn: RedirectFn | null): void {
+  redirectFn = fn;
+}
+
+function defaultRedirect(target: string): void {
+  if (typeof window !== "undefined") window.location.assign(target);
+}
+
+function handle401(path: string): void {
+  // /auth/* routes own their own UX (AuthPage shows the form on /auth/me 401),
+  // so we must not pre-empt them — and redirecting from /auth itself would loop.
+  if (path.startsWith("/auth/")) return;
+  if (typeof window !== "undefined" && window.location.pathname === "/auth") return;
+  useAuthStore.getState().setUser(null);
+  (redirectFn ?? defaultRedirect)("/auth");
 }
 
 let reqCounter = 0;
@@ -39,6 +62,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* ignore */
     }
+    if (resp.status === 401) handle401(path);
     throw new ApiError(resp.status, message);
   }
   if (resp.status === 204) return undefined as T;

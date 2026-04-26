@@ -27,7 +27,7 @@ export function AuthPage() {
   return (
     <form className="auth-card" onSubmit={submit}>
       <h2>{mode === "login" ? "Sign in" : "Create account"}</h2>
-      {err && <div className="err">{err}</div>}
+      {err && <div className="err" role="alert">{err}</div>}
       {mode === "register" && (
         <input
           placeholder="Display name"

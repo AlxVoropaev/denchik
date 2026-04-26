@@ -61,34 +61,17 @@ def _safe_extension(raw: str | None) -> str:
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, SessionDep, require_workspace_member
 from app.models.attachment import Attachment
-from app.models.epic import Epic
-from app.models.epic_group import EpicGroup
-from app.models.task import Task
 from app.schemas.attachment import AttachmentOut
+from app.services.workspace import get_task_with_workspace_id
 
 router = APIRouter(tags=["attachments"])
-
-
-async def _ws_for_task(session, task_id: int) -> tuple[Task, int]:
-    task = await session.get(Task, task_id)
-    if task is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
-    epic = await session.get(Epic, task.epic_id)
-    if epic is None:
-        # Task FK normally guarantees this, but ``assert`` would vanish under
-        # ``python -O`` and the next attribute access would 500. Be explicit.
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic not found")
-    group = await session.get(EpicGroup, epic.epic_group_id)
-    if group is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic group not found")
-    return task, group.workspace_id
 
 
 @router.get("/tasks/{task_id}/attachments", response_model=list[AttachmentOut])
 async def list_attachments(
     task_id: int, user: CurrentUser, session: SessionDep
 ) -> list[Attachment]:
-    _, ws_id = await _ws_for_task(session, task_id)
+    _, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
     res = await session.execute(
         select(Attachment).where(Attachment.task_id == task_id).order_by(Attachment.id)
@@ -105,7 +88,7 @@ async def upload_attachment(
     task_id: int, file: UploadFile, user: CurrentUser, session: SessionDep
 ) -> Attachment:
     settings = get_settings()
-    task, ws_id = await _ws_for_task(session, task_id)
+    task, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
 
     # Reject anything outside the whitelist before we touch the disk. The
@@ -168,7 +151,7 @@ async def download_attachment(
     att = await session.get(Attachment, attachment_id)
     if att is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
-    _, ws_id = await _ws_for_task(session, att.task_id)
+    _, ws_id = await get_task_with_workspace_id(session, att.task_id)
     await require_workspace_member(ws_id, session, user)
     # Always serve as a generic binary download, regardless of the stored
     # content_type. This neutralizes any user-uploaded HTML/SVG/JS that would
