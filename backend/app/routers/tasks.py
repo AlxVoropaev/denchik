@@ -32,12 +32,23 @@ async def _load_task(session, task_id: int) -> Task:
     return task
 
 
-async def _attach_labels(session, task: Task, label_ids: list[int]) -> None:
-    """Replace the task's labels via the join table (avoids async lazy-load)."""
+async def _attach_labels(
+    session, task: Task, label_ids: list[int], workspace_id: int
+) -> None:
+    """Replace the task's labels via the join table (avoids async lazy-load).
+
+    Only labels that belong to ``workspace_id`` are accepted. Foreign label_ids
+    are silently dropped — without this filter, a user could attach labels
+    owned by other workspaces simply by guessing their primary keys.
+    """
     await session.execute(delete(TaskLabel).where(TaskLabel.task_id == task.id))
     if not label_ids:
         return
-    res = await session.execute(select(Label.id).where(Label.id.in_(label_ids)))
+    res = await session.execute(
+        select(Label.id).where(
+            Label.id.in_(label_ids), Label.workspace_id == workspace_id
+        )
+    )
     valid_ids = list(res.scalars().all())
     if valid_ids:
         await session.execute(
@@ -86,7 +97,7 @@ async def create_task(
     session.add(task)
     await session.flush()
     if payload.label_ids is not None:
-        await _attach_labels(session, task, payload.label_ids)
+        await _attach_labels(session, task, payload.label_ids, ws_id)
     await session.commit()
     return await _load_task(session, task.id)
 
@@ -109,13 +120,15 @@ async def update_task(
 
     data = payload.model_dump(exclude_unset=True)
     label_ids = data.pop("label_ids", None)
+    target_ws = ws_id
     if "epic_id" in data and data["epic_id"] != task.epic_id:
         new_ws = await _task_workspace_id(session, data["epic_id"])
         await require_workspace_member(new_ws, session, user)
+        target_ws = new_ws
     for field, value in data.items():
         setattr(task, field, value)
     if label_ids is not None:
-        await _attach_labels(session, task, label_ids)
+        await _attach_labels(session, task, label_ids, target_ws)
     await session.commit()
     return await _load_task(session, task.id)
 
