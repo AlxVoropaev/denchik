@@ -9,7 +9,9 @@ class Label(Base):
     __table_args__ = (UniqueConstraint("workspace_id", "name", name="uq_label_ws_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     color: Mapped[str] = mapped_column(String(16), default="#888888", nullable=False)
 
@@ -22,8 +24,8 @@ class TaskLabel(Base):
     __tablename__ = "task_labels"
 
     task_id: Mapped[int] = mapped_column(
-        ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     label_id: Mapped[int] = mapped_column(
-        ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True, index=True
     )
