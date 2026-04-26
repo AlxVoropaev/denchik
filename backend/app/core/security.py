@@ -6,14 +6,19 @@ import jwt
 
 from app.core.config import get_settings
 
+# bcrypt 4.x rejects passwords longer than 72 bytes; we truncate by hand
+# (and consistently in both hash + verify) so a hashed password stays
+# verifiable even if the raw input would otherwise blow past the limit.
+BCRYPT_MAX_BYTES = 72
+
 
 def hash_password(password: str) -> str:
-    pw = password.encode("utf-8")[:72]  # bcrypt's hard limit
+    pw = password.encode("utf-8")[:BCRYPT_MAX_BYTES]
     return bcrypt.hashpw(pw, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    pw = plain.encode("utf-8")[:72]
+    pw = plain.encode("utf-8")[:BCRYPT_MAX_BYTES]
     try:
         return bcrypt.checkpw(pw, hashed.encode("utf-8"))
     except ValueError:

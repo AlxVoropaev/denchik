@@ -5,34 +5,17 @@ from sqlalchemy import select
 
 from app.core.deps import CurrentUser, SessionDep, require_workspace_member
 from app.models.comment import Comment
-from app.models.epic import Epic
-from app.models.epic_group import EpicGroup
-from app.models.task import Task
 from app.schemas.comment import CommentCreate, CommentOut
+from app.services.workspace import get_task_with_workspace_id
 
 router = APIRouter(prefix="/tasks/{task_id}/comments", tags=["comments"])
-
-
-async def _ws_for_task(session, task_id: int) -> tuple[Task, int]:
-    task = await session.get(Task, task_id)
-    if task is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
-    epic = await session.get(Epic, task.epic_id)
-    if epic is None:
-        # Task FK normally guarantees this, but ``assert`` would vanish under
-        # ``python -O`` and the next attribute access would 500. Be explicit.
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic not found")
-    group = await session.get(EpicGroup, epic.epic_group_id)
-    if group is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic group not found")
-    return task, group.workspace_id
 
 
 @router.get("", response_model=list[CommentOut])
 async def list_comments(
     task_id: int, user: CurrentUser, session: SessionDep
 ) -> list[Comment]:
-    _, ws_id = await _ws_for_task(session, task_id)
+    _, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
     res = await session.execute(
         select(Comment).where(Comment.task_id == task_id).order_by(Comment.created_at, Comment.id)
@@ -44,7 +27,7 @@ async def list_comments(
 async def create_comment(
     task_id: int, payload: CommentCreate, user: CurrentUser, session: SessionDep
 ) -> Comment:
-    task, ws_id = await _ws_for_task(session, task_id)
+    task, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
 
     if payload.parent_comment_id is not None:
@@ -76,7 +59,7 @@ async def edit_comment(
     user: CurrentUser,
     session: SessionDep,
 ) -> Comment:
-    _, ws_id = await _ws_for_task(session, task_id)
+    _, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
     comment = await session.get(Comment, comment_id)
     if comment is None or comment.task_id != task_id:
@@ -94,7 +77,7 @@ async def edit_comment(
 async def delete_comment(
     task_id: int, comment_id: int, user: CurrentUser, session: SessionDep
 ) -> None:
-    _, ws_id = await _ws_for_task(session, task_id)
+    _, ws_id = await get_task_with_workspace_id(session, task_id)
     await require_workspace_member(ws_id, session, user)
     comment = await session.get(Comment, comment_id)
     if comment is None or comment.task_id != task_id:
