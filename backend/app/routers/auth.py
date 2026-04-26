@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, SessionDep
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import LoginIn, RegisterIn, UserOut
@@ -26,7 +27,10 @@ def _set_session_cookie(response: Response, user_id: int) -> None:
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterIn, response: Response, session: SessionDep) -> User:
+@limiter.limit("10/hour")
+async def register(
+    request: Request, payload: RegisterIn, response: Response, session: SessionDep
+) -> User:
     user = User(
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
@@ -44,7 +48,10 @@ async def register(payload: RegisterIn, response: Response, session: SessionDep)
 
 
 @router.post("/login", response_model=UserOut)
-async def login(payload: LoginIn, response: Response, session: SessionDep) -> User:
+@limiter.limit("5/minute")
+async def login(
+    request: Request, payload: LoginIn, response: Response, session: SessionDep
+) -> User:
     res = await session.execute(select(User).where(User.email == payload.email.lower()))
     user = res.scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):

@@ -14,6 +14,7 @@ os.environ["JWT_SECRET"] = "test-secret"
 
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, get_engine, reset_engine_for_tests  # noqa: E402
+from app.core.rate_limit import limiter  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 
@@ -28,6 +29,7 @@ def event_loop_policy():
 async def app():
     get_settings.cache_clear()
     reset_engine_for_tests()
+    limiter.reset()
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
