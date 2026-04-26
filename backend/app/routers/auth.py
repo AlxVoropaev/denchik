@@ -12,6 +12,7 @@ from app.schemas.auth import LoginIn, RegisterIn, UserOut
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+# SameSite=Strict: no cross-site flow needs the session cookie, so no UX regression.
 def _set_session_cookie(response: Response, user_id: int) -> None:
     settings = get_settings()
     token = create_access_token(str(user_id))
@@ -20,7 +21,7 @@ def _set_session_cookie(response: Response, user_id: int) -> None:
         value=token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite="strict",
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )
