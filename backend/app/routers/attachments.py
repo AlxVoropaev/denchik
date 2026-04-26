@@ -1,10 +1,39 @@
 import os
+import re
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+
+# Whitelist for storage-side extension. Anything that doesn't match is dropped
+# rather than reflected onto disk, so a hostile filename can't shape the
+# on-disk path (e.g. embed `/`, `..`, control chars, or a wildly long suffix).
+_SAFE_EXT_RE = re.compile(r"^\.[A-Za-z0-9]{1,16}$")
+# Allowed characters for the human-facing filename we keep in the DB and
+# echo back via Content-Disposition. Anything else becomes `_`. This blocks
+# CR/LF, slashes, backslashes, NULs, and other control bytes.
+_UNSAFE_NAME_CHARS_RE = re.compile(r"[^A-Za-z0-9._\- ]")
+_MAX_DISPLAY_FILENAME_LEN = 200
+
+
+def _sanitize_display_filename(raw: str | None) -> str:
+    """Return a filesystem-/header-safe version of a user-supplied filename.
+
+    Strips path components, replaces unsafe characters with ``_``, caps length.
+    Empty or all-junk input collapses to ``"file"``.
+    """
+    base = os.path.basename(raw or "")
+    base = _UNSAFE_NAME_CHARS_RE.sub("_", base)
+    base = base.strip(" .") or "file"
+    return base[:_MAX_DISPLAY_FILENAME_LEN]
+
+
+def _safe_extension(raw: str | None) -> str:
+    """Extract a whitelisted extension from a user-supplied filename, or ``""``."""
+    ext = os.path.splitext(os.path.basename(raw or ""))[1].lower()
+    return ext if _SAFE_EXT_RE.match(ext) else ""
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, SessionDep, require_workspace_member
@@ -57,7 +86,8 @@ async def upload_attachment(
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File too large")
 
     Path(settings.attachments_dir).mkdir(parents=True, exist_ok=True)
-    storage_name = f"{uuid.uuid4().hex}_{file.filename}"
+    safe_display_name = _sanitize_display_filename(file.filename)
+    storage_name = f"{uuid.uuid4().hex}{_safe_extension(file.filename)}"
     storage_path = os.path.join(settings.attachments_dir, storage_name)
     with open(storage_path, "wb") as f:
         f.write(data)
@@ -65,7 +95,7 @@ async def upload_attachment(
     att = Attachment(
         task_id=task.id,
         uploaded_by=user.id,
-        filename=file.filename or "file",
+        filename=safe_display_name,
         content_type=file.content_type or "application/octet-stream",
         size=len(data),
         storage_path=storage_path,
