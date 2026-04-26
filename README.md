@@ -10,10 +10,26 @@ React 18 + Vite + TanStack Query on the frontend.
 
 ## Quick start
 
+Copy the example env file and set a real `JWT_SECRET` before the first
+boot — the backend container refuses to start without it:
+
+```bash
+cp .env.example .env
+# Generate a random secret in a throwaway python container:
+docker run --rm python:3.12-slim python -c "import secrets; print(secrets.token_urlsafe(48))"
+# Paste the output into .env as JWT_SECRET=...
+```
+
+Then:
+
 ```bash
 make up         # build & start backend (:8000) and frontend (:5173)
 open http://localhost:5173
 ```
+
+`.env` is git-ignored. `CORS_ORIGINS`, `COOKIE_SECURE`, and `VITE_API_URL`
+are also pulled from `.env` with sensible dev defaults baked into
+`docker-compose.yml`. Set `COOKIE_SECURE=true` when serving over HTTPS.
 
 Stop:
 
