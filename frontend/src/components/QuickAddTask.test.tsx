@@ -30,4 +30,25 @@ describe("QuickAddTask", () => {
     expect(await screen.findByRole("button", { name: /add task/i })).toBeInTheDocument();
     expect(state.tasks).toHaveLength(0);
   });
+
+  it("submits via form-level submit (IME-safe path)", async () => {
+    // When an IME is composing, the Enter that finishes composition is
+    // consumed by the IME and does not fire onKeyDown with key === "Enter".
+    // Simulate that path by submitting the form directly — this only works
+    // if the input is wrapped in a <form> with a submit handler.
+    const user = userEvent.setup();
+    renderWithProviders(<QuickAddTask epicId={100} />);
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    const input = await screen.findByPlaceholderText(/Task title/i);
+    await user.type(input, "Из IME");
+
+    const form = input.closest("form");
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+
+    await waitFor(() => expect(state.tasks).toHaveLength(1));
+    expect(state.tasks[0].title).toBe("Из IME");
+    expect(state.tasks[0].epic_id).toBe(100);
+  });
 });

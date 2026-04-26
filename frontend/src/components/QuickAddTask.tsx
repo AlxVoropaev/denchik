@@ -46,23 +46,37 @@ export function QuickAddTask({ epicId, defaultStatus }: Props) {
   }
 
   return (
-    <input
-      ref={inputRef}
-      className="quick-add-input"
-      placeholder="Task title — Enter to save, Esc to cancel"
-      value={title}
-      disabled={isPending}
-      onChange={(e) => setTitle(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") submit();
-        if (e.key === "Escape") {
-          setTitle("");
-          setOpen(false);
-        }
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
       }}
-      onBlur={() => {
-        if (!title.trim()) setOpen(false);
-      }}
-    />
+    >
+      <input
+        ref={inputRef}
+        className="quick-add-input"
+        placeholder="Task title — Enter to save, Esc to cancel"
+        value={title}
+        disabled={isPending}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setTitle("");
+            setOpen(false);
+          }
+        }}
+        onBlur={() => {
+          if (!title.trim()) setOpen(false);
+        }}
+      />
+      {/*
+        Hidden submit button: ensures form-level submit fires on Enter,
+        including when an IME is composing and React's synthetic keydown
+        does not see key === "Enter".
+      */}
+      <button type="submit" hidden aria-hidden="true" tabIndex={-1}>
+        Add
+      </button>
+    </form>
   );
 }
