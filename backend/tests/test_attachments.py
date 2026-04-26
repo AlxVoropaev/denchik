@@ -93,6 +93,75 @@ async def test_attachment_filename_path_traversal_is_neutralized(auth_client, ta
     assert storage_path.is_file()
 
 
+async def test_upload_does_not_orphan_file_on_commit_failure(
+    auth_client, task, monkeypatch
+):
+    """If the DB commit fails after the file has already been written, the
+    on-disk file must be unlinked so we don't leak orphaned blobs in the
+    attachments dir. After unhooking the failure, a subsequent successful
+    upload must result in exactly one file being present."""
+    import os as _os
+    from pathlib import Path as _Path
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    attachments_dir = _Path(settings.attachments_dir)
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+
+    # Snapshot whatever was already written by earlier fixtures (none here,
+    # but be defensive) so we count only new files.
+    pre_existing = {
+        p.name for p in attachments_dir.iterdir() if p.is_file()
+    }
+
+    # Patch AsyncSession.commit to raise the first time it's called from
+    # within the upload handler. We restore it before doing the second
+    # (successful) upload.
+    original_commit = AsyncSession.commit
+
+    async def boom_commit(self):  # type: ignore[no-untyped-def]
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(AsyncSession, "commit", boom_commit)
+
+    # httpx's ASGITransport propagates app-level exceptions by default, so we
+    # expect the forced RuntimeError to bubble out of the request call.
+    import pytest as _pytest
+
+    files = {"file": ("oops.txt", io.BytesIO(b"orphan?"), "text/plain")}
+    with _pytest.raises(RuntimeError, match="forced commit failure"):
+        await auth_client.post(
+            f"/tasks/{task['id']}/attachments", files=files
+        )
+
+    new_files_after_failure = {
+        p.name for p in attachments_dir.iterdir() if p.is_file()
+    } - pre_existing
+    assert new_files_after_failure == set(), (
+        f"commit failure left orphaned file(s): {new_files_after_failure}"
+    )
+
+    # Restore commit and verify a clean upload now produces exactly one file.
+    monkeypatch.setattr(AsyncSession, "commit", original_commit)
+
+    files = {"file": ("ok.txt", io.BytesIO(b"good"), "text/plain")}
+    r2 = await auth_client.post(
+        f"/tasks/{task['id']}/attachments", files=files
+    )
+    assert r2.status_code == 201, r2.text
+
+    new_files_after_success = {
+        p.name for p in attachments_dir.iterdir() if p.is_file()
+    } - pre_existing
+    assert len(new_files_after_success) == 1, (
+        f"expected exactly one new file after successful upload, "
+        f"got: {new_files_after_success}"
+    )
+
+
 async def test_attachment_extension_whitelisted_and_name_sanitized(auth_client, task):
     """`.exe` is a normal extension and must survive on the storage filename.
     A nasty name with `#`, `/`, `..` must be sanitized in the DB filename."""
