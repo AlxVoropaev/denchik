@@ -8,7 +8,9 @@ class Epic(Base):
     __tablename__ = "epics"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    epic_group_id: Mapped[int] = mapped_column(ForeignKey("epic_groups.id", ondelete="CASCADE"))
+    epic_group_id: Mapped[int] = mapped_column(
+        ForeignKey("epic_groups.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
