@@ -213,3 +213,35 @@ async def test_attachment_extension_whitelisted_and_name_sanitized(auth_client, 
     assert str(storage_path).startswith(str(attachments_dir) + _os.sep)
     base = _os.path.basename(att2.storage_path)
     assert "/" not in base and ".." not in base
+
+
+async def test_upload_rejects_disallowed_content_type(auth_client, task):
+    """Uploading a file whose declared Content-Type is outside the whitelist
+    must be rejected with 415 — guards against attacker-uploaded HTML/SVG
+    that, if rendered inline, would XSS on the app origin."""
+    files = {"file": ("evil.html", io.BytesIO(b"<script>alert(1)</script>"), "text/html")}
+    r = await auth_client.post(f"/tasks/{task['id']}/attachments", files=files)
+    assert r.status_code == 415, r.text
+
+
+async def test_upload_accepts_allowed_content_type(auth_client, task):
+    """A common allowed content type (image/png) is accepted normally."""
+    files = {"file": ("pic.png", io.BytesIO(b"\x89PNG\r\n\x1a\n"), "image/png")}
+    r = await auth_client.post(f"/tasks/{task['id']}/attachments", files=files)
+    assert r.status_code == 201, r.text
+
+
+async def test_download_forces_octet_stream_and_attachment_disposition(auth_client, task):
+    """Even when stored content_type is benign, download must respond with
+    application/octet-stream and Content-Disposition: attachment;... so that
+    user-uploaded content cannot be rendered inline by the browser."""
+    files = {"file": ("note.txt", io.BytesIO(b"hello"), "text/plain")}
+    up = await auth_client.post(f"/tasks/{task['id']}/attachments", files=files)
+    assert up.status_code == 201, up.text
+    aid = up.json()["id"]
+
+    dl = await auth_client.get(f"/attachments/{aid}/download")
+    assert dl.status_code == 200
+    assert dl.headers["content-type"] == "application/octet-stream"
+    disposition = dl.headers.get("content-disposition", "")
+    assert disposition.lower().startswith("attachment;"), disposition
