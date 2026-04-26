@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -23,6 +24,25 @@ from app.routers import (
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("denchik")
 
+SENSITIVE_PATHS = {"/auth/login", "/auth/register"}
+SENSITIVE_FIELDS = {"password", "current_password", "new_password"}
+
+
+def _redact_body_for_log(path: str, body: bytes) -> str:
+    if not body:
+        return ""
+    if path in SENSITIVE_PATHS:
+        try:
+            parsed = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            return "<unparseable redacted body>"
+        if isinstance(parsed, dict):
+            for key in list(parsed.keys()):
+                if key in SENSITIVE_FIELDS:
+                    parsed[key] = "<redacted>"
+        return json.dumps(parsed)
+    return body[:500].decode("utf-8", "replace")
+
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -40,7 +60,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
             request.url.path,
             dict(request.query_params),
             {k: ("<set>" if v else "<empty>") for k, v in request.cookies.items()},
-            body[:500].decode("utf-8", "replace") if body else "",
+            _redact_body_for_log(request.url.path, body),
         )
         t0 = time.perf_counter()
         try:
