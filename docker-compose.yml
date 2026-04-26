@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    container_name: denchik-backend
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////app/data/denchik.db
+      ATTACHMENTS_DIR: /app/data/attachments
+      JWT_SECRET: dev-jwt-secret-change-me-please-32b
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: denchik-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

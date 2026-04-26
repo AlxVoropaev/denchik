@@ -1,0 +1,38 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #172b4d; }
+button { cursor: pointer; }
+
+.app-shell { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+.topbar { background: #0747a6; color: #fff; display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+.topbar a { color: #fff; text-decoration: none; padding: 6px 10px; border-radius: 4px; }
+.topbar a.active { background: rgba(255,255,255,0.2); }
+.topbar .spacer { flex: 1; }
+
+.board { display: flex; gap: 12px; padding: 12px; overflow-x: auto; height: 100%; align-items: flex-start; }
+.column { background: #ebecf0; border-radius: 6px; min-width: 280px; max-width: 280px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.column h3 { margin: 4px 8px; font-size: 14px; text-transform: uppercase; color: #5e6c84; }
+.task-card { background: #fff; padding: 8px 10px; border-radius: 4px; box-shadow: 0 1px 0 rgba(9,30,66,0.25); cursor: pointer; }
+.task-card.dragging { opacity: 0.4; }
+
+.quick-add { background: rgba(9,30,66,0.04); border: none; padding: 8px 10px; border-radius: 4px; text-align: left; color: #5e6c84; font-size: 14px; }
+.quick-add:hover { background: rgba(9,30,66,0.08); color: #172b4d; }
+.quick-add-input { width: 100%; padding: 8px 10px; border-radius: 4px; border: 1px solid #dfe1e6; font-size: 14px; }
+
+.forum { padding: 16px; max-width: 980px; margin: 0 auto; }
+.subforum { background: #fff; border-radius: 6px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(9,30,66,0.08); }
+.subforum h3 { margin: 0; padding: 12px 16px; border-bottom: 1px solid #dfe1e6; font-size: 16px; }
+.topic-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #f0f1f4; align-items: center; }
+.topic-row:last-child { border-bottom: none; }
+.topic-row a { color: #0747a6; text-decoration: none; font-weight: 500; }
+.topic-row .meta { color: #5e6c84; font-size: 13px; }
+
+.task-detail { padding: 16px; max-width: 880px; margin: 0 auto; background: #fff; border-radius: 6px; }
+.task-detail h1 { margin: 0 0 8px 0; }
+.task-detail .desc { white-space: pre-wrap; padding: 12px; background: #f4f5f7; border-radius: 4px; min-height: 60px; }
+.comment { padding: 10px 12px; border: 1px solid #dfe1e6; border-radius: 4px; margin-top: 8px; background: #fafbfc; }
+.comment.reply { margin-left: 32px; background: #fff; }
+
+.auth-card { max-width: 360px; margin: 80px auto; background: #fff; padding: 24px; border-radius: 6px; box-shadow: 0 4px 12px rgba(9,30,66,0.1); }
+.auth-card input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #dfe1e6; border-radius: 4px; font-size: 14px; }
+.auth-card button { width: 100%; padding: 10px; background: #0052cc; color: #fff; border: none; border-radius: 4px; font-weight: 600; }
+.auth-card .err { color: #de350b; font-size: 13px; margin-bottom: 10px; }
