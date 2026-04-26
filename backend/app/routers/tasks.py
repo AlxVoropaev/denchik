@@ -18,7 +18,10 @@ async def _task_workspace_id(session, epic_id: int) -> int:
     if epic is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic not found")
     group = await session.get(EpicGroup, epic.epic_group_id)
-    assert group is not None
+    if group is None:
+        # Epic FK normally guarantees this, but ``assert`` would vanish under
+        # ``python -O`` and the next attribute access would 500. Be explicit.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Epic group not found")
     return group.workspace_id
 
 
